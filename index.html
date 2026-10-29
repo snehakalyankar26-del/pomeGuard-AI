@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomegranate AI Vision — Disease & Edibility Detector</title>
+    <meta name="description" content="AI-powered Pomegranate Disease Detector using PyTorch MobileNetV2 and Machine Learning. Detect diseases and assess edibility instantly.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'gradient-x': 'gradient-x 4s ease infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'blob': 'blob 8s infinite',
+                    },
+                    keyframes: {
+                        'gradient-x': {
+                            '0%, 100%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'left center'
+                            },
+                            '50%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'right center'
+                            },
+                        },
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        },
+                        'blob': {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(25px, -40px) scale(1.08)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.92)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.78);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+        .glass-dark {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+    </style>
+</head>
+<body class="bg-[#fcf9f9] min-h-screen font-sans selection:bg-rose-200 selection:text-rose-900 flex flex-col justify-between relative overflow-x-hidden text-gray-800">
+    
+    <!-- Animated Ambient Background Blobs -->
+    <div class="fixed top-0 -left-10 w-96 h-96 bg-rose-200/60 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob pointer-events-none"></div>
+    <div class="fixed top-20 -right-10 w-96 h-96 bg-amber-100/70 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000 pointer-events-none"></div>
+    <div class="fixed -bottom-20 left-1/3 w-96 h-96 bg-pink-200/50 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-4000 pointer-events-none"></div>
+
+    <!-- Navigation / Top bar -->
+    <nav class="relative z-20 w-full px-6 py-4 flex items-center justify-between max-w-6xl mx-auto">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-white shadow-md shadow-rose-500/20">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+            </div>
+            <div>
+                <span class="font-extrabold text-lg text-gray-900 tracking-tight">Pomegranate<span class="text-rose-600">AI</span></span>
+                <span class="hidden sm:inline-block ml-2 px-2 py-0.5 text-[11px] font-semibold bg-rose-100 text-rose-700 rounded-md">MobileNetV2</span>
+            </div>
+        </div>
+
+        <!-- Backend Status & Settings -->
+        <div class="flex items-center space-x-3">
+            <button id="open-api-modal-btn" class="flex items-center space-x-2 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all bg-white/80 hover:bg-white shadow-sm border-gray-200">
+                <span id="backend-status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                <span id="backend-status-text" class="text-gray-700">Checking API...</span>
+                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="container mx-auto px-4 py-8 relative z-10 max-w-4xl flex-grow">
+        <!-- Hero Header -->
+        <header class="text-center mb-10 animate__animated animate__fadeInDown">
+            <div class="inline-flex items-center gap-2 mb-3 px-3.5 py-1.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm border border-rose-100 text-xs font-bold text-rose-600">
+                <span class="flex h-2 w-2 relative">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-600"></span>
+                </span>
+                Deep Learning Pathology Scanner
+            </div>
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-4 tracking-tight leading-tight">
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-700 animate-gradient-x">
+                    Pomegranate Disease Detector
+                </span>
+            </h1>
+            <p class="text-gray-600 text-base md:text-lg font-medium max-w-2xl mx-auto">
+                Scan pomegranate fruit images to instantly classify diseases, verify edibility status, and understand toxicological health impacts.
+            </p>
+        </header>
+
+        <!-- Main Card -->
+        <div class="glass rounded-3xl shadow-[0_20px_50px_-12px_rgba(225,29,72,0.12)] p-6 md:p-10 border border-white/80 animate__animated animate__fadeInUp">
+            
+            <!-- Upload Dropzone -->
+            <div id="upload-container" class="mb-6 relative group transition-all duration-300">
+                <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-64 md:h-72 border-2 border-dashed border-rose-300 rounded-2xl cursor-pointer bg-white/60 hover:bg-rose-50/40 hover:border-rose-500 transition-all duration-300 group-hover:shadow-lg group-hover:shadow-rose-100/50">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                        <div class="w-16 h-16 mb-4 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                            <svg class="w-8 h-8 animate-float" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <p class="mb-2 text-base md:text-lg text-gray-700">
+                            <span class="font-bold text-rose-600">Click to upload image</span> or drag and drop
+                        </p>
+                        <p class="text-xs text-gray-500">Supported formats: JPG, JPEG, PNG, WEBP (High-res recommended)</p>
+                    </div>
+                    <input id="dropzone-file" type="file" class="hidden" accept="image/*" />
+                </label>
+            </div>
+
+            <!-- Image Preview Box -->
+            <div id="preview-container" class="hidden mb-6 text-center animate__animated animate__fadeIn">
+                <div class="relative inline-block max-w-full">
+                    <img id="image-preview" class="max-h-72 rounded-2xl shadow-md border-4 border-white object-cover mx-auto" alt="Pomegranate preview"/>
+                    <button id="reset-btn" title="Remove image" class="absolute -top-3 -right-3 bg-white text-gray-700 hover:text-red-600 rounded-full p-2 shadow-lg transition-colors border border-gray-200">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error Banner -->
+            <div id="error-banner" class="hidden mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm animate__animated animate__shakeX">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <span id="error-message" class="font-semibold"></span>
+                        <div id="error-hint" class="mt-1 text-xs text-red-700"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analyze Button -->
+            <div class="flex flex-col items-center justify-center">
+                <button id="analyze-btn" class="w-full md:w-3/4 bg-gradient-to-r from-red-600 via-rose-600 to-red-600 text-white font-bold text-lg py-4 px-8 rounded-2xl shadow-lg shadow-rose-600/30 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-xl hover:shadow-rose-600/40 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2" disabled>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <span>Run AI Disease Analysis</span>
+                </button>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loading" class="hidden flex-col justify-center items-center mt-8 py-4 animate__animated animate__fadeIn">
+                <div class="relative w-14 h-14">
+                    <div class="absolute top-0 left-0 w-full h-full border-4 border-rose-200 rounded-full"></div>
+                    <div class="absolute top-0 left-0 w-full h-full border-4 border-rose-600 rounded-full border-t-transparent animate-spin"></div>
+                </div>
+                <span class="mt-4 text-rose-600 font-semibold text-sm animate-pulse">Running Neural Feature Extraction & Classification...</span>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results" class="hidden mt-8 border-t border-gray-200/80 pt-8 animate__animated animate__fadeInUp">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-black text-gray-900">Diagnosis Report</h2>
+                        <p class="text-xs text-gray-500">Generated by PyTorch MobileNetV2 + Support Vector Classifier</p>
+                    </div>
+                    <span id="res-edible" class="text-sm font-extrabold px-4 py-2 rounded-full shadow-sm"></span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <!-- Detected Class Card -->
+                    <div class="bg-white/90 p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                        <span class="text-gray-400 text-xs font-bold uppercase tracking-wider">Identified Condition</span>
+                        <div class="mt-2 flex items-baseline justify-between">
+                            <span id="res-class" class="text-2xl font-extrabold text-gray-900"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Confidence Score Card -->
+                    <div class="bg-white/90 p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-400 text-xs font-bold uppercase tracking-wider">Model Confidence</span>
+                            <span id="res-confidence-text" class="text-lg font-black text-rose-600"></span>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                            <div id="confidence-bar" class="bg-gradient-to-r from-rose-500 to-red-600 h-3 rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Information Cards -->
+                <div class="space-y-4">
+                    <!-- Botanical Overview -->
+                    <div class="bg-white/90 border-l-4 border-indigo-500 p-5 rounded-r-2xl shadow-sm">
+                        <div class="flex items-center mb-2 text-indigo-900">
+                            <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <h3 class="font-bold text-base">Pathological Description</h3>
+                        </div>
+                        <p id="res-desc" class="text-gray-700 text-sm leading-relaxed"></p>
+                    </div>
+                    
+                    <!-- Health & Consumption Safety -->
+                    <div id="health-effects-container" class="bg-white/90 border-l-4 p-5 rounded-r-2xl shadow-sm">
+                        <div class="flex items-center mb-2">
+                            <svg id="health-icon" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"></svg>
+                            <h3 id="health-title" class="font-bold text-base"></h3>
+                        </div>
+                        <p id="res-health" class="text-gray-700 text-sm leading-relaxed"></p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Disease Quick Guide Reference -->
+        <section class="mt-12">
+            <h2 class="text-center font-bold text-gray-800 text-lg mb-6">Detectable Pomegranate Conditions</h2>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-center text-xs">
+                <div class="bg-white/70 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div class="w-3 h-3 rounded-full bg-green-500 mx-auto mb-2"></div>
+                    <span class="font-bold text-gray-800 block">Healthy</span>
+                    <span class="text-gray-500 text-[11px]">Safe to Eat</span>
+                </div>
+                <div class="bg-white/70 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
+                    <span class="font-bold text-gray-800 block">Alternaria</span>
+                    <span class="text-gray-500 text-[11px]">Heart Rot</span>
+                </div>
+                <div class="bg-white/70 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
+                    <span class="font-bold text-gray-800 block">Anthracnose</span>
+                    <span class="text-gray-500 text-[11px]">Sunken Lesions</span>
+                </div>
+                <div class="bg-white/70 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
+                    <span class="font-bold text-gray-800 block">Bacterial Blight</span>
+                    <span class="text-gray-500 text-[11px]">Fruit Cracking</span>
+                </div>
+                <div class="bg-white/70 backdrop-blur-sm p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div class="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2"></div>
+                    <span class="font-bold text-gray-800 block">Cercospora</span>
+                    <span class="text-gray-500 text-[11px]">Rind Spotting</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="relative z-10 py-6 text-center text-xs text-gray-500">
+        <p>Pomegranate Disease AI &bull; Built with PyTorch, MobileNetV2, and Scikit-Learn</p>
+    </footer>
+
+    <!-- API Settings Modal -->
+    <div id="api-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm hidden animate__animated animate__fadeIn">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-gray-100 animate__animated animate__zoomIn">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="font-extrabold text-gray-900 text-lg">Backend API Configuration</h3>
+                </div>
+                <button id="close-api-modal-btn" class="text-gray-400 hover:text-gray-600 p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <p class="text-xs text-gray-600 mb-4 leading-relaxed">
+                If hosting this frontend on <strong>Netlify</strong>, provide the URL of your deployed Python Flask/PyTorch backend (e.g. on <strong>Render</strong> or <strong>Railway</strong>). If running locally, leave blank.
+            </p>
+
+            <div class="mb-4">
+                <label for="api-url-input" class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Backend Server URL</label>
+                <input id="api-url-input" type="url" placeholder="https://your-pomegranate-app.onrender.com" class="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all" />
+                <p class="text-[11px] text-gray-400 mt-1">Leave empty to use relative <code>/predict</code> (default for local Flask and Netlify <code>_redirects</code>).</p>
+            </div>
+
+            <div id="modal-test-feedback" class="hidden mb-4 p-3 rounded-xl text-xs"></div>
+
+            <div class="flex items-center space-x-2">
+                <button id="test-api-btn" class="flex-1 py-2 px-3 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors">
+                    Test Connection
+                </button>
+                <button id="save-api-btn" class="flex-1 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-colors">
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic Script -->
+    <script>
+        const fileInput = document.getElementById('dropzone-file');
+        const preview = document.getElementById('image-preview');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const uploadContainer = document.getElementById('upload-container');
+        const previewContainer = document.getElementById('preview-container');
+        const resetBtn = document.getElementById('reset-btn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const errorBanner = document.getElementById('error-banner');
+        const errorMessage = document.getElementById('error-message');
+        const errorHint = document.getElementById('error-hint');
+        
+        // Modal & API Config Elements
+        const openModalBtn = document.getElementById('open-api-modal-btn');
+        const closeModalBtn = document.getElementById('close-api-modal-btn');
+        const apiModal = document.getElementById('api-modal');
+        const apiUrlInput = document.getElementById('api-url-input');
+        const saveApiBtn = document.getElementById('save-api-btn');
+        const testApiBtn = document.getElementById('test-api-btn');
+        const modalTestFeedback = document.getElementById('modal-test-feedback');
+        const backendStatusDot = document.getElementById('backend-status-dot');
+        const backendStatusText = document.getElementById('backend-status-text');
+
+        let selectedFile = null;
+
+        // Retrieve saved backend API URL from localStorage
+        function getBackendUrl() {
+            let url = localStorage.getItem('pomegranate_api_url') || '';
+            return url.trim().replace(/\/+$/, '');
+        }
+
+        function setBackendUrl(url) {
+            if (url) {
+                localStorage.setItem('pomegranate_api_url', url.trim().replace(/\/+$/, ''));
+            } else {
+                localStorage.removeItem('pomegranate_api_url');
+            }
+        }
+
+        // Test API Health
+        async function checkApiHealth() {
+            backendStatusDot.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
+            backendStatusText.innerText = "Checking API...";
+            
+            const baseUrl = getBackendUrl();
+            const healthUrl = baseUrl ? `${baseUrl}/health` : '/health';
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const res = await fetch(healthUrl, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (res.ok) {
+                    backendStatusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
+                    backendStatusText.innerText = baseUrl ? "Cloud API: Online" : "Local API: Online";
+                    return true;
+                } else {
+                    backendStatusDot.className = "w-2.5 h-2.5 rounded-full bg-red-500";
+                    backendStatusText.innerText = "API: Offline";
+                    return false;
+                }
+            } catch (err) {
+                backendStatusDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
+                backendStatusText.innerText = window.location.hostname.includes("netlify.app") 
+                    ? "Configure Cloud API" 
+                    : "Backend Disconnected";
+                return false;
+            }
+        }
+
+        // Initialize API Settings
+        apiUrlInput.value = getBackendUrl();
+        checkApiHealth();
+
+        // Modal triggers
+        openModalBtn.addEventListener('click', () => {
+            apiUrlInput.value = getBackendUrl();
+            modalTestFeedback.classList.add('hidden');
+            apiModal.classList.remove('hidden');
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            apiModal.classList.add('hidden');
+        });
+
+        apiModal.addEventListener('click', (e) => {
+            if (e.target === apiModal) apiModal.classList.add('hidden');
+        });
+
+        // Test API button inside modal
+        testApiBtn.addEventListener('click', async () => {
+            const testUrl = apiUrlInput.value.trim().replace(/\/+$/, '');
+            const target = testUrl ? `${testUrl}/health` : '/health';
+            
+            modalTestFeedback.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-red-50', 'text-red-800');
+            modalTestFeedback.classList.add('bg-blue-50', 'text-blue-800');
+            modalTestFeedback.innerText = "Connecting to " + target + "...";
+
+            try {
+                const res = await fetch(target);
+                if (res.ok) {
+                    const data = await res.json();
+                    modalTestFeedback.className = "mb-4 p-3 rounded-xl text-xs bg-emerald-50 text-emerald-800 border border-emerald-200";
+                    modalTestFeedback.innerText = `Connected successfully! Model loaded: ${data.model_loaded ? 'Yes' : 'No'}`;
+                } else {
+                    throw new Error("HTTP " + res.status);
+                }
+            } catch (err) {
+                modalTestFeedback.className = "mb-4 p-3 rounded-xl text-xs bg-red-50 text-red-800 border border-red-200";
+                modalTestFeedback.innerText = "Connection failed. Please ensure your backend is deployed and CORS is enabled.";
+            }
+        });
+
+        // Save API button
+        saveApiBtn.addEventListener('click', () => {
+            setBackendUrl(apiUrlInput.value);
+            apiModal.classList.add('hidden');
+            checkApiHealth();
+        });
+
+        function showError(msg, hint = "") {
+            errorMessage.innerText = msg;
+            errorHint.innerText = hint;
+            errorBanner.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorBanner.classList.add('hidden');
+        }
+
+        // Reset functionality
+        resetBtn.addEventListener('click', () => {
+            selectedFile = null;
+            fileInput.value = '';
+            previewContainer.classList.add('hidden');
+            uploadContainer.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+            results.classList.add('hidden');
+            hideError();
+        });
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                if (!file.type.startsWith('image/')) {
+                    showError("Please select a valid image file (JPG, PNG, WEBP).");
+                    return;
+                }
+                hideError();
+                selectedFile = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    uploadContainer.classList.add('hidden');
+                    previewContainer.classList.remove('hidden');
+                    analyzeBtn.disabled = false;
+                    results.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Drag & drop handlers
+        ['dragenter', 'dragover'].forEach(name => {
+            uploadContainer.addEventListener(name, (e) => {
+                e.preventDefault();
+                uploadContainer.querySelector('label').classList.add('border-rose-500', 'bg-rose-50/70');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(name => {
+            uploadContainer.addEventListener(name, (e) => {
+                e.preventDefault();
+                uploadContainer.querySelector('label').classList.remove('border-rose-500', 'bg-rose-50/70');
+            });
+        });
+
+        uploadContainer.addEventListener('drop', (e) => {
+            if (e.dataTransfer.files && e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        // Analyze button handler
+        analyzeBtn.addEventListener('click', async function() {
+            if (!selectedFile) return;
+            
+            analyzeBtn.disabled = true;
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+            hideError();
+            
+            document.getElementById('confidence-bar').style.width = '0%';
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            const baseUrl = getBackendUrl();
+            const predictUrl = baseUrl ? `${baseUrl}/predict` : '/predict';
+            
+            try {
+                const response = await fetch(predictUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('res-class').innerText = data.class;
+                    document.getElementById('res-confidence-text').innerText = data.confidence;
+                    
+                    setTimeout(() => {
+                        const rawConf = parseFloat(data.confidence) || 0;
+                        document.getElementById('confidence-bar').style.width = Math.min(100, Math.max(5, rawConf)) + '%';
+                    }, 100);
+                    
+                    const edibleBadge = document.getElementById('res-edible');
+                    const healthContainer = document.getElementById('health-effects-container');
+                    const healthTitle = document.getElementById('health-title');
+                    const healthIcon = document.getElementById('health-icon');
+                    
+                    healthContainer.classList.remove('hidden', 'border-red-500', 'border-emerald-500');
+                    
+                    if (data.edible) {
+                        edibleBadge.innerText = 'SAFE FOR CONSUMPTION';
+                        edibleBadge.className = 'text-xs md:text-sm font-extrabold px-4 py-2 rounded-full shadow-sm bg-emerald-100 text-emerald-800 border border-emerald-300';
+                        
+                        healthContainer.classList.add('border-emerald-500');
+                        healthTitle.innerText = "Nutritional & Health Benefits";
+                        healthTitle.className = "font-bold text-base text-emerald-900";
+                        healthIcon.className = "w-5 h-5 mr-2 text-emerald-600";
+                        healthIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+                    } else {
+                        edibleBadge.innerText = 'NOT SAFE / INFECTED FRUIT';
+                        edibleBadge.className = 'text-xs md:text-sm font-extrabold px-4 py-2 rounded-full shadow-sm bg-red-100 text-red-800 border border-red-300';
+                        
+                        healthContainer.classList.add('border-red-500');
+                        healthTitle.innerText = "Health Risks & Toxicity";
+                        healthTitle.className = "font-bold text-base text-red-900";
+                        healthIcon.className = "w-5 h-5 mr-2 text-red-600";
+                        healthIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>';
+                    }
+                    
+                    document.getElementById('res-desc').innerText = data.description;
+                    document.getElementById('res-health').innerText = data.health_effects;
+                    
+                    results.classList.remove('hidden');
+                } else {
+                    showError(data.error || "An error occurred during prediction.", "Make sure the file is a clear pomegranate photo.");
+                }
+            } catch (error) {
+                if (window.location.hostname.includes("netlify.app") && !baseUrl) {
+                    showError(
+                        "Netlify Static Frontend is running, but no Backend API is linked yet.",
+                        "Click the 'Checking API' / 'Settings' button at the top right to paste your live backend URL (e.g. from Render), or configure Netlify redirects."
+                    );
+                } else {
+                    showError(
+                        "Cannot connect to the AI Prediction Server.",
+                        "If running locally, start your server with 'python app.py'. If using Render free tier, the instance might take 30-40 seconds to wake up."
+                    );
+                }
+                console.error("Prediction Error:", error);
+            } finally {
+                loading.classList.add('hidden');
+                analyzeBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

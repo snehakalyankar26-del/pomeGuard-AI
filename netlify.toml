@@ -1,0 +1,9 @@
+# Netlify Configuration
+[build]
+  publish = "templates"
+
+# Single-page fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
